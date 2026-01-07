@@ -1,0 +1,100 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local Animations = script.Parent:WaitForChild("Animations")
+
+local Tool = script.Parent
+local Handle = Tool:WaitForChild("Handle")
+local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local Animator = Humanoid:WaitForChild("Animator")
+local mouse = Player:GetMouse()
+
+local GunGui = Player.PlayerGui.GunGui
+local AmmoText = GunGui:WaitForChild("AmmoText")
+
+local Ammo = 32
+local MaxAmmo = 32
+local FireRate = 0.2
+local ReloadingTime = 1.5
+local FireballCooldown = 20
+
+local FireballInfo = TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out, 0, false, 0)
+
+local ReloadAnim = Animator:LoadAnimation(Animations:WaitForChild("Reload"))
+local RecoilAnim = Animator:LoadAnimation(Animations:WaitForChild("Recoil"))
+
+local reloading = false
+local Equipped = false
+local DB = false
+local FireballDB
+
+--// Events
+local ShootEvent = Remotes:WaitForChild("Shoot")
+local FireballEvent = Remotes:WaitForChild("Fireball")
+local BlowEvent = Remotes:WaitForChild("Blow")
+
+Tool.Equipped:Connect(function()
+	GunGui.Enabled = true
+	AmmoText.Text = Ammo.."/".. MaxAmmo
+	Equipped = true
+	Handle.EquipSound:Play()
+end)
+
+Tool.Unequipped:Connect(function()
+	GunGui.Enabled = false
+	Equipped = false
+	Handle.UnequipSound:Play()
+end)
+
+local function Reload()
+	if Ammo == MaxAmmo or not Equipped or reloading then return end
+	ReloadAnim:Play()
+	AmmoText.Text = "Reloading..."
+	reloading = true
+	Handle.Reload:Play()
+	task.wait(ReloadingTime)
+	Ammo = MaxAmmo
+	ReloadAnim:Stop()    
+	reloading = false
+	print(Player.Name.. " just reloaded so he now has: "..MaxAmmo.. " rounds in his magazine")
+end
+
+UserInputService.InputBegan:Connect(function(input, processed, IsTyping)
+	if processed or IsTyping then return end
+	
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if Equipped == true and not DB and not reloading then
+			DB = true
+			if Ammo > 0 then
+				ShootEvent:FireServer(mouse.Hit.Position)
+				RecoilAnim:Play()
+				Ammo -= 1
+				Handle.FireSound:Play()
+				task.wait(FireRate)
+				DB = false
+				AmmoText.Text = Ammo.."/".. MaxAmmo
+				BlowEvent:FireServer(Player)
+				RecoilAnim:Stop()
+			else
+				Handle.Tick:Play()
+			end
+		end
+	end
+	
+	if input.KeyCode == Enum.KeyCode.R then
+		Reload()
+		AmmoText.Text = Ammo.."/".. MaxAmmo
+	end
+	
+	if input.KeyCode == Enum.KeyCode.E then
+		if Equipped == true and not FireballDB and not reloading then
+			FireballDB = true
+			FireballEvent:FireServer(mouse.Hit.Position)
+			task.wait(FireballCooldown)
+			FireballDB = false
+		end
+	end

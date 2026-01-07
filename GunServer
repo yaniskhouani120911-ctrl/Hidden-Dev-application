@@ -1,0 +1,133 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local StarterPack = game:GetService("StarterPack")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+
+local FireballInfo = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
+
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local Assets = ReplicatedStorage:WaitForChild("Assets")
+
+local Shoot = Remotes:WaitForChild("Shoot")
+local Fireball = Remotes:WaitForChild("Fireball")
+local Blow = Remotes:WaitForChild("Blow")
+
+local HitboxDebrisFolder = workspace:FindFirstChild("HitboxDebris") or Instance.new("Folder")
+HitboxDebrisFolder.Name = "HitboxDebris"
+HitboxDebrisFolder.Parent = workspace
+
+local AttackDebrisFolder = workspace:FindFirstChild("AttackDebris") or Instance.new("Folder")
+AttackDebrisFolder.Name = "AttackDebris"
+AttackDebrisFolder.Parent = workspace
+
+local ToolTemplate = StarterPack:WaitForChild("Handgun")
+
+Shoot.OnServerEvent:Connect(function(player, mouse)
+	local hitbox = Instance.new("Part")
+	hitbox.Size = Vector3.new(0.1, 0.1, 0.1)
+	hitbox.Parent = HitboxDebrisFolder
+	hitbox.Name = "Hitbox"
+	hitbox.CFrame = CFrame.new(mouse)
+	hitbox.Anchored = true
+	hitbox.Transparency = 0.5
+	hitbox.BrickColor = BrickColor.new("Really red")
+	
+	Debris:AddItem(hitbox, 0.5)
+	
+	hitbox.Touched:Connect(function(hit)
+		local VictimChar = hit.Parent
+		local VictimHumanoid = VictimChar:FindFirstChild("Humanoid")
+		
+		local UserChar = player.Character
+		local UserHumanoid = UserChar and UserChar:FindFirstChild("Humanoid")
+		
+		if not UserChar or not UserHumanoid then
+            return
+        end
+
+		if VictimChar == UserChar then
+			return
+		end
+		
+		if VictimHumanoid and UserHumanoid then
+			VictimHumanoid:TakeDamage(10)
+		end
+	end)
+end)
+
+Fireball.OnServerEvent:Connect(function(player, mouse)
+	local character = player.Character
+    if not character then 
+        return 
+    end
+
+    local equippedTool = character:FindFirstChild(ToolTemplate.Name)
+    local toolHandle = equippedTool and equippedTool:FindFirstChild("Handle")
+    
+    if not equippedTool or not toolHandle then 
+        return 
+    end
+
+	local FireballSpawnPosition = toolHandle.CFrame.Position + toolHandle.CFrame.LookVector * 2 
+	local FireballTemplate = Assets:WaitForChild("Fireball")
+	local FireballInstance = FireballTemplate:Clone()
+	
+	FireballInstance.Parent = AttackDebrisFolder
+	FireballInstance.CFrame = CFrame.new(FireballSpawnPosition)
+	
+	local FireballTween = TweenService:Create(FireballInstance, FireballInfo, {Position = mouse})
+	FireballTween:Play()
+	
+	local FireDissipationTime = 2
+	
+	FireballInstance.Touched:Connect(function(hit)
+		local UserChar = player.Character
+		
+		if hit.Parent == UserChar then return end
+		
+		local VictimChar = hit.Parent
+		local VictimHumanoid = VictimChar:FindFirstChild("Humanoid")
+		local VictimHumanoidRootPart = VictimChar:FindFirstChild("HumanoidRootPart")
+		
+		if VictimHumanoid and VictimHumanoidRootPart then
+			local Fire = Instance.new("Fire")
+			Fire.Size = 10
+			Fire.Color = Color3.new(1, 0, 0)
+			Fire.SecondaryColor = Color3.new(1, 0.639216, 0.0117647)
+			Fire.Parent = VictimHumanoidRootPart
+			
+			VictimHumanoid:TakeDamage(50)
+			
+			Debris:AddItem(Fire, FireDissipationTime)
+		end
+	end)
+	
+	Debris:AddItem(FireballInstance, 5)
+end)
+
+Blow.OnServerEvent:Connect(function(player)
+	local BlowChanceValue = 1
+	local SafeChanceValue = 10
+	local rollBlowingChance = math.random(BlowChanceValue, SafeChanceValue)
+	
+	local UserChar = player.Character
+	local UserHumanoid = UserChar and UserChar:FindFirstChild("Humanoid")
+	local UserHumanoidRootPart = UserChar and UserChar:FindFirstChild("HumanoidRootPart")
+	
+	if not UserChar or not UserHumanoid or not UserHumanoidRootPart then
+		return
+	end
+	
+	if rollBlowingChance == BlowChanceValue then
+		local explosion = Instance.new("Explosion")
+		explosion.BlastRadius = 10
+		explosion.BlastPressure = 100000
+		explosion.Position = UserHumanoidRootPart.Position
+		explosion.Parent = AttackDebrisFolder
+		Debris:AddItem(explosion, 1)
+		UserHumanoid:TakeDamage(100)
+	elseif rollBlowingChance == SafeChanceValue then
+		return
+	end
+end)
